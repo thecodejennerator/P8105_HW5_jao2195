@@ -4,16 +4,90 @@ author: "Jennifer Osei"
 date: "2023-11-15"
 output: github_document
 ---
+### Problem 0
 
-```{r, message=FALSE}
-#Needed Libraries
+This "problem" focuses on structure of your submission, especially the use git and GitHub for reproducibility, R Projects to organize your work, R Markdown to write reproducible reports, relative paths to load data from local files, and reasonable naming structures for your files. This was not prepared as a GitHub repo.
+
+```{r load_libraries}
 library(tidyverse)
-library(readr)
-library(readxl)
-library(dplyr)
 ```
 
+
+### Problem 1
+
+For this problem, we are interested in data gathered and made public by _The Washington Post_ on homicides in 50 large U.S. cities. The code chunk below imports and cleans the data.
+
+```{r}
+homicide_df = 
+  read_csv("p1_data/homicide-data.csv", na = c("", "NA", "Unknown")) %>%
+  mutate(
+    city_state = str_c(city, state, sep = ", "),
+    resolution = case_when(
+      disposition == "Closed without arrest" ~ "unsolved",
+      disposition == "Open/No arrest"        ~ "unsolved",
+      disposition == "Closed by arrest"      ~ "solved"
+    )
+  ) %>% 
+  filter(city_state != "Tulsa, AL") 
+```
+
+The resulting dataframe has `r nrow(homicide_df)` entries, on variables that include the victim name, race, age, and sex; the date the homicide was reported; and the location of the homicide. In cleaning, I created a `city_state` variable that includes both city and state, and a `resolution` variable to indicate whether the case was closed by arrest. I also excluded one entry in Tulsa, AL, which is not a major US city and is most likely a data entry error. 
+
+In the next code chunk, I group within cities and summarize to produce the total number of homicides and the number that are solved. 
+
+```{r}
+city_homicide_df = 
+  homicide_df %>% 
+  select(city_state, disposition, resolution) %>% 
+  group_by(city_state) %>% 
+  summarize(
+    hom_total = n(),
+    hom_unsolved = sum(resolution == "unsolved"))
+```
+
+Focusing only on Baltimore, MD, I can use the `prop.test` and `broom::tidy` functions to obtain an estimate and CI of the proportion of unsolved homicides in that city. The table below shows those values.
+
+```{r}
+bmore_test = 
+  prop.test(
+    x = filter(city_homicide_df, city_state == "Baltimore, MD") %>% pull(hom_unsolved),
+    n = filter(city_homicide_df, city_state == "Baltimore, MD") %>% pull(hom_total)) 
+
+broom::tidy(bmore_test) %>% 
+  knitr::kable(digits = 3)
+```
+
+Building on this code, I can use functions in the `purrr` package to obtain estimates and CIs for the proportion of unsolved homicides in each city in my dataset. The code below implements this analysis. 
+
+```{r}
+test_results = 
+  city_homicide_df %>% 
+  mutate(
+    prop_tests = map2(hom_unsolved, hom_total, \(x, y) prop.test(x = x, n = y)),
+    tidy_tests = map(prop_tests, broom::tidy)) %>% 
+  select(-prop_tests) %>% 
+  unnest(tidy_tests) %>% 
+  select(city_state, estimate, conf.low, conf.high) %>% 
+  mutate(city_state = fct_reorder(city_state, estimate))
+```
+
+Finally, I make a plot showing the estimate (and CI) of the proportion of unsolved homicides in each city.
+
+```{r}
+test_results %>% 
+  mutate(city_state = fct_reorder(city_state, estimate)) %>% 
+  ggplot(aes(x = city_state, y = estimate)) + 
+  geom_point() + 
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+This figure suggests a very wide range in the rate at which homicides are solved -- Chicago is noticeably high and, given the narrowness of the CI, likely is the location of many homicides. 
+
+
+###############################################################
 ### Problem 2
+###############################################################
 This zip file contains data from a longitudinal study that included a control arm and an experimental arm. Data for each participant is included in a separate file, and file names include the subject ID and arm.
 
 #### Problem 2.1 Create a tidy dataframe containing data from all participants, including the subject ID, arm, and observations over time:
@@ -28,10 +102,16 @@ study_files
 # Defining a function to read data from a file
 read_my_csv <- function(file_path) {
   mydata <- read_csv(file_path)
-  mydata <- mutate(mydata, treatment_group = str_remove(basename(file_path), "\\.csv")) #Remove .csv
-  mydata <- separate(mydata, treatment_group, into = c("arm", "subject_id"), sep = "_") #creating 2 columns one for Subject Arm and the other for Subject ID from the filename. 
+  mydata <- mutate(mydata, subject_id = str_remove(basename(file_path), "\\.csv"), 
+                        (arm = case_when(
+    str_detect(subject_id, "con_") ~ "Control",
+    str_detect(subject_id, "exp_") ~ "Experimental",
+    TRUE ~ NA_character_
+  )))
+
   return(mydata)
 }
+#creating 2 columns one for Subject Arm and the other for Subject ID from the filename. 
 ```
 
 #### Problem 2.2 
@@ -44,6 +124,8 @@ list_of_datasets <- purrr::map(study_files, ~read_my_csv(.))
 # Bind all the individual datasets into a single dataframe.
 
 my_fully_combined_dataset <- bind_rows(list_of_datasets)
+my_fully_combined_dataset <- select(arm,subject_id,everything())
+
 ```
 
 #### Problem 2.3
@@ -60,6 +142,7 @@ Tidy the result; manipulate file names to include control arm and subject ID, ma
 Make a spaghetti plot showing observations on each subject over time, and comment on differences between groups.
 
 ```{r}
+
 
 ```
 
