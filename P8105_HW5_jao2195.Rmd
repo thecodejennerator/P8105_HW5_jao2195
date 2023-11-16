@@ -1,7 +1,7 @@
 ---
 title: "Homework Assignemnt 5 (P8105_HW5_jao2195)"
 author: "Jennifer Osei <br>"
-date: '`r format(Sys.time(), "%A %B %d,%Y")`'
+date: '`r format(Sys.time(), "%A %B %d, %Y")`'
 output: github_document
 ---
 ################################################################################
@@ -186,10 +186,11 @@ When designing an experiment or analysis, a common question is whether it is lik
 
 ```{r}
 ### [Problem 3.1] - Setting up Simmulation
-#Setting the design elements
+# Setting the design elements
 n  <- 30            # 1.Sample size, n
 σ  <- 5            # 2.Standard deviation, σ 
 μ  <- 0            # 3.True mean, μ
+alpha <- 0.05      # 4.Estimate / P Value Function
 
 # Set the number of datasets to generate
 num_datasets <- 5000
@@ -198,28 +199,192 @@ num_datasets <- 5000
 set.seed(123)
 
 # Generate 5000 datasets
-simulated_data <- matrix(rnorm(n * num_datasets, mean = μ , sd = σ), ncol = num_datasets)
+simulated_data <- rnorm(n * num_datasets, mean = μ , sd = σ)
 
 # Check the structure of the generated data
 str(simulated_data)
 
 ```
 
+### [Problem 3.2] For each dataset, save μ̂ and the p-value arising from a test of H:μ=0 using α=0.05. Hint: to obtain the estimate and p-value, use broom::tidy to clean the output of t.test.Repeat the above for μ={1,2,3,4,5,6}, and complete the following:
 
-For each dataset, save μ̂ 
- and the p-value arising from a test of H:μ=0
- using α=0.05
-. Hint: to obtain the estimate and p-value, use broom::tidy to clean the output of t.test.
+### [Problem 3.3] Make a plot showing the proportion of times the null was rejected (the power of the test) on the y axis and the true value of μ on the x axis. Describe the association between effect size and power.
 
-Repeat the above for μ={1,2,3,4,5,6}
-, and complete the following:
+### [Problem 3.4] Make a plot showing the <br> 1) Average estimate of μ̂ on the y axis and the true value of μ on the x axis. <br> 2) Make a second plot (or overlay on the first) the average estimate of μ̂ only in samples for which the null was rejected on the y axis and the true value of μ on the x axis. 
+
+### [Problem 3.5]Is the sample average of μ̂ across tests for which the null is rejected approximately equal to the true value of μ? Why or why not?
+
+
+```{r}
+
+## Problem 3 
+
+# When designing an experiment or analysis, a common question is whether it is likely that a true effect will be detected – put differently, whether a false null hypothesis will be rejected. The probability that a false null hypothesis is rejected is referred to as power, and it depends on several factors, including: the sample size; the effect size; and the error variance. In this problem, you will conduct a simulation to explore power in a one-sample t-test.
+# 
+# First set the following design elements:
+# 
+#  Fix n=30
+#  Fix σ=5
+#  Set μ=0
+#  Generate 5000 datasets from the model
+# 
+#  x∼Normal[μ,σ]
+# 
+#  For each dataset, save μ̂  and the p-value arising from a test of H:μ=0 using α=0.05. Hint: to obtain the estimate and p-value, use broom::tidy to clean the output of t.test.
+# 
+#  Repeat the above for μ={1,2,3,4,5,6}, and complete the following:
+
+
+#defining the elements
+set.seed(123456)
+
+n = 30
+sigma = 5
+mu_ = 0:6
+alpha = 0.05
+datasets = 5000
+
+#generating 5000 datasets and saving μ̂ and the p-value arising from a test of H:μ=0 using α=0.05. 
+
+simulations_df = map_dfr(mu_, function(mu) {
+  tibble(mu = mu,
+         sim = purrr::map(1:datasets, ~t.test(rnorm(n, mu, sigma))),
+         estimate = map_dbl(sim, ~broom::tidy(.x)$estimate), # broom::tidy for cleaning
+         p_value = map_dbl(sim, ~broom::tidy(.x)$p.value), # broom::tidy for cleaning
+         reject = p_value < alpha)
+})
+```
+
+#######################################################################################
 
 Make a plot showing the proportion of times the null was rejected (the power of the test) on the y axis and the true value of μ on the x axis. Describe the association between effect size and power.
 
-Make a plot showing the 
-1) Average estimate of μ̂ on the y axis and the true value of μ on the x axis.
-2) Make a second plot (or overlay on the first) the average estimate of μ̂ only in samples for which the null was rejected on the y axis and the true value of μ on the x axis. 
+```{r}
+proport_times <- simulations_df |>
+  group_by(mu)|>
+  summarize(avg_mu_hat = mean(estimate),
+            avg_mu_hat_reject = mean(estimate[reject]),
+            power = mean(reject))
 
-Is the sample average of μ̂ across tests for which the null is rejected approximately equal to the true value of μ? Why or why not?
 
 
+ggplot(proport_times, aes(x = mu, y = power)) +
+  geom_point() + 
+  geom_line() +
+  labs(x = "True value of μ",
+       y = "Power of the test")
+```
+
+
+##### Explanations:
+Effect size and power of the test are positively associated. Our graph confirms that. As true value of mu increases, the difference between the true mean and null hypothesis mean increases and this lead to an increase in the proportion of times that the null was rejected. The proportion of times that the null rejected, the statistical test will correctly reject the false null hypothesis.
+
+
+#######################################################################################
+
+Make a plot showing the average estimate of μ̂  on the y axis and the true value of μ on the x axis. Make a second plot (or overlay on the first) the average estimate of μ̂  only in samples for which the null was rejected on the y axis and the true value of μ on the x axis. Is the sample average of μ̂  across tests for which the null is rejected approximately equal to the true value of μ? Why or why not?
+
+```{r}
+ggplot(proport_times, aes(x=mu)) + 
+  geom_point(aes(y = avg_mu_hat, color = "average estimate of mu")) +
+  geom_line(aes(y = avg_mu_hat, color = "average estimate of mu")) +
+  geom_point(aes(y = avg_mu_hat_reject, color = "average estimate of mu for rejected")) +
+  geom_line(aes(y = avg_mu_hat_reject, color = "average estimate of mu for rejected")) +
+  labs(
+    x = "true value of μ hat",
+    y = "average estimate of μ hat")
+```
+
+## Problem 3 
+
+When designing an experiment or analysis, a common question is whether it is likely that a true effect will be detected – put differently, whether a false null hypothesis will be rejected. The probability that a false null hypothesis is rejected is referred to as power, and it depends on several factors, including: the sample size; the effect size; and the error variance. In this problem, you will conduct a simulation to explore power in a one-sample t-test.
+
+First set the following design elements:
+
+ Fix n=30
+ Fix σ=5
+ Set μ=0
+ Generate 5000 datasets from the model
+
+ x∼Normal[μ,σ]
+
+ For each dataset, save μ̂  and the p-value arising from a test of H:μ=0 using α=0.05. Hint: to obtain the estimate and p-value, use broom::tidy to clean the output of t.test.
+
+ Repeat the above for μ={1,2,3,4,5,6}, and complete the following:
+
+
+
+```{r}
+#defining the elements
+set.seed(123456)
+
+n = 30
+sigma = 5
+mu_ = 0:6
+alpha = 0.05
+datasets = 5000
+
+#generating 5000 datasets and saving μ̂ and the p-value arising from a test of H:μ=0 using α=0.05. 
+
+simulations_df = map_dfr(mu_, function(mu) {
+  tibble(mu = mu,
+         sim = purrr::map(1:datasets, ~t.test(rnorm(n, mu, sigma))),
+         estimate = map_dbl(sim, ~broom::tidy(.x)$estimate), # broom::tidy for cleaning
+         p_value = map_dbl(sim, ~broom::tidy(.x)$p.value), # broom::tidy for cleaning
+         reject = p_value < alpha)
+})
+```
+
+
+Make a plot showing the proportion of times the null was rejected (the power of the test) on the y axis and the true value of μ on the x axis. Describe the association between effect size and power.
+
+```{r}
+proport_times <- simulations_df %>% 
+  group_by(mu) %>% 
+  summarize(avg_mu_hat = mean(estimate),
+            avg_mu_hat_reject = mean(estimate[reject]),
+            power = mean(reject))
+
+
+ggplot(prop_times, aes(x = mu, y = power)) +
+  geom_point() + 
+  geom_line() +
+  labs(x = "True value of μ",
+       y = "Power of the test")
+```
+
+##### Explanation:
+We do see that graph that effect size and power of the test are associated.As effect size increase power increases. As true value of mu increases, the difference between the true mean and null hypothesis mean increases and this lead to an increase in the proportion of times that the null was rejected. The proportion of times that the null rejected, the statistical test will correctly reject the false null hypothesis.
+
+
+Make a plot showing the average estimate of μ̂  on the y axis and the true value of μ on the x axis. Make a second plot (or overlay on the first) the average estimate of μ̂  only in samples for which the null was rejected on the y axis and the true value of μ on the x axis. Is the sample average of μ̂  across tests for which the null is rejected approximately equal to the true value of μ? Why or why not?
+
+```{r}
+ggplot(prop_times, aes(x=mu)) + 
+  geom_point(aes(y = avg_mu_hat, color = "average estimate of mu")) +
+  geom_line(aes(y = avg_mu_hat, color = "average estimate of mu")) +
+  geom_point(aes(y = avg_mu_hat_reject, color = "average estimate of mu for rejected")) +
+  geom_line(aes(y = avg_mu_hat_reject, color = "average estimate of mu for rejected")) +
+  labs(
+    x = "true value of μ hat",
+    y = "average estimate of μ hat")
+
+```
+
+```{r}
+ggplot(proport_times, aes(x=mu, y = avg_mu_hat, color = "average estimate of mu"))+
+  geom_point()+
+  geom_line()+
+  labs(
+    x = "true value of μ",
+    y = "average estimate of μ hat")
+
+
+ggplot(proport_times, aes(x=mu, y = avg_mu_hat_reject, color = "average estimate of mu for rejected" ))+
+  geom_point()+
+  geom_line()+
+   labs(
+    x = "true value of μ",
+    y = "average estimate of μ̂  only in samples for which the null was rejected")
+```
+The sample average of μ̂  across tests for which the null is rejected approximately is not equal to the true value of μ. When null is rejected, average estimate of mu is higher than true value of mu. This can be due to sampling variation, type I error, random fluctuations, effect size, power, and randomness in simulations. 
