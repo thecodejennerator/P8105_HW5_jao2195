@@ -346,7 +346,7 @@ proport_times <- simulations_df %>%
             power = mean(reject))
 
 
-ggplot(prop_times, aes(x = mu, y = power)) +
+ggplot(proport_times, aes(x = mu, y = power)) +
   geom_point() + 
   geom_line() +
   labs(x = "True value of μ",
@@ -360,7 +360,7 @@ We do see that graph that effect size and power of the test are associated.As ef
 Make a plot showing the average estimate of μ̂  on the y axis and the true value of μ on the x axis. Make a second plot (or overlay on the first) the average estimate of μ̂  only in samples for which the null was rejected on the y axis and the true value of μ on the x axis. Is the sample average of μ̂  across tests for which the null is rejected approximately equal to the true value of μ? Why or why not?
 
 ```{r}
-ggplot(prop_times, aes(x=mu)) + 
+ggplot(proport_times, aes(x=mu)) + 
   geom_point(aes(y = avg_mu_hat, color = "average estimate of mu")) +
   geom_line(aes(y = avg_mu_hat, color = "average estimate of mu")) +
   geom_point(aes(y = avg_mu_hat_reject, color = "average estimate of mu for rejected")) +
